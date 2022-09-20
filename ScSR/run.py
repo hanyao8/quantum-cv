@@ -4,7 +4,7 @@ from os.path import isdir
 from skimage.io import imread, imsave
 from skimage.color import rgb2ycbcr, ycbcr2rgb
 from skimage.transform import resize
-from scipy.misc import imresize
+#from scipy.misc import imresize
 from tqdm import tqdm
 import pickle
 from ScSR import ScSR
@@ -48,8 +48,12 @@ with open('data/dicts/Dl_' + dict_name + '.pkl', 'rb') as f:
 Dl = normalize(Dl)
 
 ### SET PARAMETERS
-img_lr_dir = 'data/val_lr/'
-img_hr_dir = 'data/val_hr/'
+#img_lr_dir = 'data/val_lr/'
+#img_hr_dir = 'data/val_hr/'
+#img_lr_dir = '/Users/hchoong/Desktop/eth/sa_a3nas/data/SR_testing_datasets/Set5/LR/'
+#img_hr_dir = '/Users/hchoong/Desktop/eth/sa_a3nas/data/SR_testing_datasets/Set5/HR/'
+img_lr_dir = '/Users/hchoong/Desktop/github/quantum-cv/ScSR/data/val_lr/'
+img_hr_dir = '/Users/hchoong/Desktop/github/quantum-cv/ScSR/data/val_hr/'
 overlap = 1
 lmbd = 0.1
 upscale = 3
@@ -71,7 +75,8 @@ for i in tqdm(range(len(img_lr_file))):
 
     # Read and save ground truth image
     img_hr = imread('{}{}'.format(img_hr_dir, img_name))
-    imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '3HR.png'), img_hr, quality=100)
+    #imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '3HR.png'), img_hr, quality=100)
+    imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '3HR.png'), img_hr)
     img_hr_y = rgb2ycbcr(img_hr)[:, :, 0]
 
     # Change color space
@@ -87,15 +92,19 @@ for i in tqdm(range(len(img_lr_file))):
     img_sr_cr = resize(img_lr_cr, (img_hr.shape[0], img_hr.shape[1]), order=0)
 
     # Super Resolution via Sparse Representation
+    print('Before ScSR call')
     img_sr_y = ScSR(img_lr_y, img_hr_y.shape, upscale, Dh, Dl, lmbd, overlap)
+    print('After ScSR call')
     img_sr_y = backprojection(img_sr_y, img_lr_y, maxIter)
+    print('Backprojection done')
 
     # Create colored SR images
     img_sr = np.stack((img_sr_y, img_sr_cb, img_sr_cr), axis=2)
     img_sr = ycbcr2rgb(img_sr)
 
     # Signal normalization
-    for channel in range(len(img_sr.shape[2])):
+    #for channel in range(len(img_sr.shape[2])):
+    for channel in range(img_sr.shape[2]):
         img_sr[:, :, channel] = normalize_signal(img_sr, channel)
 
     # Maximum pixel intensity normalization
@@ -103,7 +112,8 @@ for i in tqdm(range(len(img_lr_file))):
 
     # Bicubic interpolation for reference
     img_bc = resize(img_lr_ori, (img_hr.shape[0], img_hr.shape[1]))
-    imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '1bicubic.png'), img_bc, quality=100)
+    #imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '1bicubic.png'), img_bc, quality=100)
+    imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '1bicubic.png'), img_bc)
     img_bc_y = rgb2ycbcr(img_bc)[:, :, 0]
 
     # Compute RMSE for the illuminance
@@ -114,4 +124,5 @@ for i in tqdm(range(len(img_lr_file))):
     np.savetxt('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', 'RMSE_bicubic.txt'), rmse_bc_hr)
     np.savetxt('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', 'RMSE_SR.txt'), rmse_sr_hr)
 
-    imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '2SR.png'), img_sr, quality=100)
+    #imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '2SR.png'), img_sr, quality=100)
+    imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '2SR.png'), img_sr)
