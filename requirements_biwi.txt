@@ -1,0 +1,14 @@
+imageio
+ipython
+jupyter
+matplotlib
+numpy
+Pillow
+PyWavelets
+PyYAML
+QtPy
+scikit-image
+scikit-learn
+scipy
+tqdm
+wheel
