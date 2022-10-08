@@ -34,9 +34,11 @@ def normalize_max(img):
 
 # Set which dictionary you want to use
 D_size = 2048
+#D_size = 512
 US_mag = 3
 lmbd = 0.1
 patch_size= 3
+#patch_size= 5
 
 dict_name = str(D_size) + '_US' + str(US_mag) + '_L' + str(lmbd) + '_PS' + str(patch_size)
 
@@ -71,6 +73,8 @@ for i in tqdm(range(len(img_lr_file))):
     img_name_dir = ''.join(img_name_dir)
     if isdir('data/results/' + dict_name + '_' + img_name_dir) == False:
         new_dir = mkdir('{}{}'.format('data/results/' + dict_name + '_', img_name_dir))
+    print(img_lr_dir)
+    print(img_name)
     img_lr = imread('{}{}'.format(img_lr_dir, img_name))
 
     # Read and save ground truth image
