@@ -12,6 +12,8 @@ from backprojection import backprojection
 from sklearn.metrics import mean_squared_error 
 from sklearn.preprocessing import normalize
 
+import os
+
 def normalize_signal(img, channel):
     if np.mean(img[:, :, channel]) * 255 > np.mean(img_lr_ori[:, :, channel]):
         ratio = np.mean(img_lr_ori[:, :, channel]) / (np.mean(img[:, :, channel]) * 255)
@@ -34,11 +36,9 @@ def normalize_max(img):
 
 # Set which dictionary you want to use
 D_size = 2048
-#D_size = 512
 US_mag = 3
 lmbd = 0.1
 patch_size= 3
-#patch_size= 5
 
 dict_name = str(D_size) + '_US' + str(US_mag) + '_L' + str(lmbd) + '_PS' + str(patch_size)
 
@@ -54,16 +54,22 @@ Dl = normalize(Dl)
 #img_hr_dir = 'data/val_hr/'
 #img_lr_dir = '/Users/hchoong/Desktop/eth/sa_a3nas/data/SR_testing_datasets/Set5/LR/'
 #img_hr_dir = '/Users/hchoong/Desktop/eth/sa_a3nas/data/SR_testing_datasets/Set5/HR/'
-img_lr_dir = '/Users/hchoong/Desktop/github/quantum-cv/ScSR/data/val_lr/'
-img_hr_dir = '/Users/hchoong/Desktop/github/quantum-cv/ScSR/data/val_hr/'
+#img_lr_dir = '/Users/hchoong/Desktop/github/quantum-cv/ScSR/data/val_lr/'
+#img_hr_dir = '/Users/hchoong/Desktop/github/quantum-cv/ScSR/data/val_hr/'
+img_lr_dir = '/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_lr/'
+img_hr_dir = '/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_hr/'
 overlap = 1
 lmbd = 0.1
 upscale = 3
 maxIter = 100
 
+img_type = '.png'
+
 ###
 
 img_lr_file = listdir(img_lr_dir)
+img_lr_file = [item for item in img_lr_file if img_type in item]
+print(img_lr_file)
 
 for i in tqdm(range(len(img_lr_file))):
     # Read test image
@@ -71,10 +77,9 @@ for i in tqdm(range(len(img_lr_file))):
     img_name_dir = list(img_name)
     img_name_dir = np.delete(np.delete(np.delete(np.delete(img_name_dir, -1), -1), -1), -1)
     img_name_dir = ''.join(img_name_dir)
+    print(img_name_dir)
     if isdir('data/results/' + dict_name + '_' + img_name_dir) == False:
-        new_dir = mkdir('{}{}'.format('data/results/' + dict_name + '_', img_name_dir))
-    print(img_lr_dir)
-    print(img_name)
+        new_dir = os.makedirs('{}{}'.format('data/results/' + dict_name + '_', img_name_dir))
     img_lr = imread('{}{}'.format(img_lr_dir, img_name))
 
     # Read and save ground truth image
