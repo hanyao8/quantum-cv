@@ -11,30 +11,49 @@ def fss_yang(lmbd, A, b):
 
     [net,control]=NNQP_FeatureSign(net,A,b,control)
     """
+
+    #print(A.shape)
+    #print(b.shape)
+    #if len(b.shape)==1:
+    #    b = b.reshape((b.shape[0],1))
  
     EPS = 1e-9
     x = np.zeros((A.shape[1], 1))
     # print('X =', x.shape)
     grad = np.dot(A, x) + b 
-    # print('GRAD =', grad.shape)
+    print('GRAD =', grad.shape)
     ma = np.amax(np.multiply(abs(grad), np.isin(x, 0).T), axis=0)
-    mi = np.zeros(grad.shape[1])
-    for j in range(grad.shape[1]):
-        for i in range(grad.shape[0]):
-            if grad[i, j] == ma[j]:
-                mi[j] = i
+    #mi = np.zeros(grad.shape[1])
+    mi = np.zeros(grad.shape[0])
+    for i in range(grad.shape[0]):
+        for j in range(grad.shape[1]):
+            if grad[i, j] == ma[i]:
+                mi[i] = j
                 break
     mi = mi.astype(int)
     # print(grad[mi])
     while True:
-
+        print('mi:')
+        print(mi)
+        print('x[mi] shape: ')
+        print(x[mi].shape)        
+        print('lmbd: ')
+        print(lmbd)
+        print('grad[mi] shape: ')
+        print(grad[mi].shape)
+        print('A[mi,mi] shape: ')
+        print(A[mi,mi].shape)
+        
         if np.all(grad[mi]) > lmbd + EPS:
             x[mi] = (lmbd - grad[mi]) / A[mi, mi]
         elif np.all(grad[mi]) < - lmbd - EPS:
             x[mi] = (- lmbd - grad[mi]) / A[mi, mi]
         else:
+            print('else')
             if np.all(x == 0):
                 break
+
+        #raise(Exception)
 
         while True:
             
@@ -44,6 +63,8 @@ def fss_yang(lmbd, A, b):
             xa = x[a]
 
             vect = -lmbd * np.sign(xa) - ba
+            print(Aa.shape)
+            print(vect.shape)
             x_new = np.linalg.lstsq(Aa, vect)
             idx = np.where(x_new != 0)
             o_new = np.dot((vect[idx] / 2 + ba[idx]).T, x_new[idx]) + lmbd * np.sum(abs(x_new[idx]))

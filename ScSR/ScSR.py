@@ -9,7 +9,11 @@ from featuresign import fss_yang
 from scipy.signal import convolve2d
 from tqdm import tqdm
 
+from sklearn import linear_model
+
 def extract_lr_feat(img_lr):
+    #print('ScSR line 13, img_lr')
+    #print(img_lr)
     h, w = img_lr.shape
     img_lr_feat = np.zeros((h, w, 4))
 
@@ -27,6 +31,8 @@ def extract_lr_feat(img_lr):
     img_lr_feat[:, :, 2] = convolve2d(img_lr, hf2, 'same')
     img_lr_feat[:, :, 3] = convolve2d(img_lr, vf2, 'same')
 
+    #print('ScSR line 32, img_lr_feat')
+    #print(img_lr_feat)
     return img_lr_feat
 
 def create_list_step(start, stop, step):
@@ -52,7 +58,8 @@ def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
     img_hr = np.zeros(img_us.shape)
     cnt_matrix = np.zeros(img_us.shape)
 
-    img_lr_y_feat = extract_lr_feat(img_hr)
+    #img_lr_y_feat = extract_lr_feat(img_hr)
+    img_lr_y_feat = extract_lr_feat(img_us)
 
     gridx = np.append(create_list_step(0, img_us_width - patch_size - 1, patch_size - overlap), img_us_width - patch_size - 1)
     gridy = np.append(create_list_step(0, img_us_height - patch_size - 1, patch_size - overlap), img_us_height - patch_size - 1)
@@ -60,6 +67,7 @@ def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
     count = 0
 
     for m in tqdm(range(0, len(gridx))):
+    #for m in range(0, len(gridx)):
         for n in range(0, len(gridy)):
             count += 1
             xx = int(gridx[m])
@@ -79,8 +87,26 @@ def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
             else:
                 y = feat_patch
 
-            b = np.dot(np.multiply(Dl.T, -1), y)
-            w = fss_yang(lmbd, Dl, b)
+            #b = np.dot(np.multiply(Dl.T, -1), y)
+            #if len(b.shape)==1:
+            #    b = b.reshape((b.shape[0],1))
+            #print('fss_yang arg shapes: ')
+            #print(Dl.shape)
+            #A = np.matmul(Dl.T,Dl)
+            #print(A.shape)
+            #print(b.shape)
+            #w = fss_yang(lmbd, A, b)
+
+            #reg = linear_model.Lasso(alpha=lmbd)
+            #print(Dl)
+            #print(np.sum(np.abs(Dl)))
+            #print(y)
+            reg = linear_model.Lasso(alpha=0.001)
+            reg.fit(Dl,y)
+            w = reg.coef_
+            #print(np.sum(np.abs(w)))
+            #print(w.shape)
+            
 
             hr_patch = np.dot(Dh, w)
             hr_patch = lin_scale(hr_patch, us_norm)
@@ -91,10 +117,22 @@ def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
             img_hr[yy : yy + patch_size, xx : xx + patch_size] += hr_patch
             cnt_matrix[yy : yy + patch_size, xx : xx + patch_size] += 1
 
+    print('fss_yang arg shapes: ')
+    print(Dl.shape)
+    #print(b.shape)
+
+    print('ScSR line 98, img_hr')
+    print(img_hr)
+
     index = np.where(cnt_matrix < 1)[0]
+    print(cnt_matrix)
+    print(index)
     img_hr[index] = img_us[index]
 
     cnt_matrix[index] = 1
     img_hr = np.divide(img_hr, cnt_matrix)
+
+    print('ScSR line 107, img_hr')
+    print(img_hr)
 
     return img_hr

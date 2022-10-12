@@ -12,6 +12,10 @@ from backprojection import backprojection
 from sklearn.metrics import mean_squared_error 
 from sklearn.preprocessing import normalize
 
+import math
+
+from config_run import config
+
 import os
 
 def normalize_signal(img, channel):
@@ -56,8 +60,10 @@ Dl = normalize(Dl)
 #img_hr_dir = '/Users/hchoong/Desktop/eth/sa_a3nas/data/SR_testing_datasets/Set5/HR/'
 #img_lr_dir = '/Users/hchoong/Desktop/github/quantum-cv/ScSR/data/val_lr/'
 #img_hr_dir = '/Users/hchoong/Desktop/github/quantum-cv/ScSR/data/val_hr/'
-img_lr_dir = '/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_lr/'
-img_hr_dir = '/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_hr/'
+#img_lr_dir = '/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_lr/'
+#img_hr_dir = '/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_hr/'
+img_lr_dir = config.val_lr_path
+img_hr_dir = config.val_hr_path
 overlap = 1
 lmbd = 0.1
 upscale = 3
@@ -71,21 +77,28 @@ img_lr_file = listdir(img_lr_dir)
 img_lr_file = [item for item in img_lr_file if img_type in item]
 print(img_lr_file)
 
-for i in tqdm(range(len(img_lr_file))):
+#for i in tqdm(range(len(img_lr_file))):
+for i in range(len(img_lr_file)):
     # Read test image
     img_name = img_lr_file[i]
     img_name_dir = list(img_name)
     img_name_dir = np.delete(np.delete(np.delete(np.delete(img_name_dir, -1), -1), -1), -1)
     img_name_dir = ''.join(img_name_dir)
     print(img_name_dir)
-    if isdir('data/results/' + dict_name + '_' + img_name_dir) == False:
-        new_dir = os.makedirs('{}{}'.format('data/results/' + dict_name + '_', img_name_dir))
-    img_lr = imread('{}{}'.format(img_lr_dir, img_name))
+    img_sr_dir = os.path.join(*[config.root_dir,'data','results',config.exp_name,dict_name+'_'+img_name_dir])
+    #if isdir('data/results/' + dict_name + '_' + img_name_dir) == False:
+    if isdir(img_sr_dir) == False:
+        #new_dir = os.makedirs('{}{}'.format('data/results/' + dict_name + '_', img_name_dir))
+        new_dir = os.makedirs(img_sr_dir)
+    #img_lr = imread('{}{}'.format(img_lr_dir, img_name))
+    img_lr = imread( os.path.join(*[img_lr_dir, img_name]) )
 
     # Read and save ground truth image
-    img_hr = imread('{}{}'.format(img_hr_dir, img_name))
+    #img_hr = imread('{}{}'.format(img_hr_dir, img_name))
+    img_hr = imread( os.path.join(*[img_hr_dir, img_name]) )
     #imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '3HR.png'), img_hr, quality=100)
-    imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '3HR.png'), img_hr)
+    #imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '3HR.png'), img_hr)
+    imsave(os.path.join(*[img_sr_dir,'3HR.png']), img_hr)
     img_hr_y = rgb2ycbcr(img_hr)[:, :, 0]
 
     # Change color space
@@ -122,7 +135,8 @@ for i in tqdm(range(len(img_lr_file))):
     # Bicubic interpolation for reference
     img_bc = resize(img_lr_ori, (img_hr.shape[0], img_hr.shape[1]))
     #imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '1bicubic.png'), img_bc, quality=100)
-    imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '1bicubic.png'), img_bc)
+    #imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '1bicubic.png'), img_bc)
+    imsave(os.path.join(*[img_sr_dir,'1bicubic.png']), img_bc)
     img_bc_y = rgb2ycbcr(img_bc)[:, :, 0]
 
     # Compute RMSE for the illuminance
@@ -130,8 +144,17 @@ for i in tqdm(range(len(img_lr_file))):
     rmse_bc_hr = np.zeros((1,)) + rmse_bc_hr
     rmse_sr_hr = np.sqrt(mean_squared_error(img_hr_y, img_sr_y))
     rmse_sr_hr = np.zeros((1,)) + rmse_sr_hr
-    np.savetxt('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', 'RMSE_bicubic.txt'), rmse_bc_hr)
-    np.savetxt('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', 'RMSE_SR.txt'), rmse_sr_hr)
+    #np.savetxt('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', 'RMSE_bicubic.txt'), rmse_bc_hr)
+    #np.savetxt('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', 'RMSE_SR.txt'), rmse_sr_hr)
+    np.savetxt(os.path.join(*[img_sr_dir, 'RMSE_bicubic.txt']), rmse_bc_hr)
+    np.savetxt(os.path.join(*[img_sr_dir, 'RMSE_SR.txt']), rmse_sr_hr)
+    print('bicubic RMSE: '+str(rmse_bc_hr))
+    print('SR RMSE: '+str(rmse_sr_hr))
+    y_psnr_bc_hr = 20*math.log10(255.0/rmse_bc_hr)
+    y_psnr_sr_hr = 20*math.log10(255.0/rmse_sr_hr)
+    print('bicubic Y-Channel PSNR: '+str(y_psnr_bc_hr))
+    print('SR Y-Channel PSNR: '+str(y_psnr_sr_hr))
 
     #imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '2SR.png'), img_sr, quality=100)
-    imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '2SR.png'), img_sr)
+    #imsave('{}{}{}{}'.format('data/results/' + dict_name + '_', img_name_dir, '/', '2SR.png'), img_sr)
+    imsave(os.path.join(*[img_sr_dir,'2SR.png']), img_sr)
