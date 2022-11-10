@@ -230,7 +230,7 @@ def custom_algo(X,y,alpha,gamma=0.02,max_iters=100):
         #w = (1-gamma)*w_prev + gamma*m*w + gamma*(1-gamma)*(1-m)*w
         #print(w_prev)
         #print(w)
-        predict(m*w)
+        #predict(m*w)
         
         step_change = np.linalg.norm(m*w-m_prev*w_prev)
         t += 1
