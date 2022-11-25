@@ -11,9 +11,12 @@ from tqdm import tqdm
 
 from sklearn import linear_model
 
+from my_algorithms import qubo_lasso
+
+import logging
+from config_run import config
+
 def extract_lr_feat(img_lr):
-    #print('ScSR line 13, img_lr')
-    #print(img_lr)
     h, w = img_lr.shape
     img_lr_feat = np.zeros((h, w, 4))
 
@@ -31,8 +34,6 @@ def extract_lr_feat(img_lr):
     img_lr_feat[:, :, 2] = convolve2d(img_lr, hf2, 'same')
     img_lr_feat[:, :, 3] = convolve2d(img_lr, vf2, 'same')
 
-    #print('ScSR line 32, img_lr_feat')
-    #print(img_lr_feat)
     return img_lr_feat
 
 def create_list_step(start, stop, step):
@@ -45,17 +46,23 @@ def lin_scale(xh, us_norm):
     hr_norm = np.sqrt(np.sum(np.multiply(xh, xh)))
 
     if hr_norm > 0:
-        s = us_norm * 1.2 / hr_norm
+        lin_scale_factor = 1.2
+        #logging.info("lin_scale_factor=%s"%str(lin_scale_factor))
+        s = us_norm * lin_scale_factor / hr_norm
+        #s = us_norm * 20.0 / hr_norm
+        #s = us_norm * 1.2 / hr_norm
+        #logging.info("s=%s"%str(s))
         xh = np.multiply(xh, s)
     return xh
 
-def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
+def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap, patch_size, sc_algo):
 
-    patch_size = 3
+    #patch_size = 3
 
     img_us = resize(img_lr_y, size)
     img_us_height, img_us_width = img_us.shape
     img_hr = np.zeros(img_us.shape)
+    img_hr_ctrl = np.zeros(img_us.shape)
     cnt_matrix = np.zeros(img_us.shape)
 
     #img_lr_y_feat = extract_lr_feat(img_hr)
@@ -66,7 +73,13 @@ def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
 
     count = 0
 
+    logging.info(gridx)
+    logging.info(gridy)
+
+    cardinality = np.zeros(len(gridx)*len(gridy))
+
     for m in tqdm(range(0, len(gridx))):
+        logging.info("Inside ScSR loop, iteration=%d"%m)
     #for m in range(0, len(gridx)):
         for n in range(0, len(gridy)):
             count += 1
@@ -97,42 +110,77 @@ def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
             #print(b.shape)
             #w = fss_yang(lmbd, A, b)
 
-            #reg = linear_model.Lasso(alpha=lmbd)
-            #print(Dl)
-            #print(np.sum(np.abs(Dl)))
-            #print(y)
-            reg = linear_model.Lasso(alpha=0.001)
-            reg.fit(Dl,y)
-            w = reg.coef_
-            #print(np.sum(np.abs(w)))
-            #print(w.shape)
-            
+            if sc_algo=="sklearn_lasso":
+                #reg = linear_model.Lasso(alpha=lmbd)
+                #lasso_alpha = 1e-3
+                #logging.info("lasso_alpha=%s"%str(lasso_alpha))
+                reg = linear_model.Lasso(alpha=config.lasso_alpha)
+                #print(Dl.shape)
+                #print(y.shape)
+                reg.fit(Dl,y)
+                w = reg.coef_
+                #logging.info("w="+str(w))
+                
+            elif sc_algo=="qubo_lasso":
+                w = qubo_lasso(Dl,y,alpha=0.1)
+            elif sc_algo=="fss":
+                b = np.dot(np.multiply(Dl.T, -1), y)
+                if len(b.shape)==1:
+                    b = b.reshape((b.shape[0],1))
+                #print('fss_yang arg shapes: ')
+                #print(Dl.shape)
+                A = np.matmul(Dl.T,Dl)
+                #print(A.shape)
+                #print(b.shape)
+                w = fss_yang(lmbd, A, b)
+                #logging.info("w="+str(w))
+
+            cardinality[count-1] = np.matmul(np.where(np.abs(w)>0,1,0),np.ones(len(w)))
 
             hr_patch = np.dot(Dh, w)
+            #logging.info(hr_patch)
             hr_patch = lin_scale(hr_patch, us_norm)
+            #logging.info(us_norm)
+            #logging.info(hr_patch)
 
             hr_patch = np.reshape(hr_patch, (patch_size, -1))
             hr_patch += us_mean
+            #logging.info(us_mean)
+            #logging.info(hr_patch)
 
-            img_hr[yy : yy + patch_size, xx : xx + patch_size] += hr_patch
-            cnt_matrix[yy : yy + patch_size, xx : xx + patch_size] += 1
+            #img_hr[yy : yy + patch_size, xx : xx + patch_size] += hr_patch
+            img_hr[yy : yy + patch_size, xx : xx + patch_size] = img_hr[yy : yy + patch_size, xx : xx + patch_size] + hr_patch
+            img_hr_ctrl[yy : yy + patch_size, xx : xx + patch_size] = img_hr_ctrl[yy : yy + patch_size, xx : xx + patch_size] + us_mean
+            #img_hr[yy : yy + patch_size, xx : xx + patch_size] = hr_patch
+            #cnt_matrix[yy : yy + patch_size, xx : xx + patch_size] += 1
+            #logging.info("cnt_matrix")
+            #logging.info(cnt_matrix[yy : yy + patch_size, xx : xx + patch_size])
+            cnt_matrix[yy : yy + patch_size, xx : xx + patch_size] = cnt_matrix[yy : yy + patch_size, xx : xx + patch_size] + 1.0
+            #logging.info(cnt_matrix[yy : yy + patch_size, xx : xx + patch_size])
 
-    print('fss_yang arg shapes: ')
-    print(Dl.shape)
-    #print(b.shape)
+    #logging.info(np.where(cnt_matrix < 1))
+    #index = np.where(cnt_matrix < 1)[0]
+    index_y,index_x = np.where(cnt_matrix < 1)
+    #logging.info(index_y)
+    #logging.info(index_x)
+    #logging.info(index)
+    assert len(index_y)==len(index_x)
+    for i in range(len(index_y)):
+        yy = index_y[i]
+        xx = index_x[i]
+        img_hr[yy][xx] = img_us[yy][xx]
+        img_hr_ctrl[yy][xx] = img_us[yy][xx]
+        cnt_matrix[yy][xx] = 1.0
 
-    print('ScSR line 98, img_hr')
-    print(img_hr)
-
-    index = np.where(cnt_matrix < 1)[0]
-    print(cnt_matrix)
-    print(index)
-    img_hr[index] = img_us[index]
-
-    cnt_matrix[index] = 1
+    #img_hr[index] = img_us[index]
+    #cnt_matrix[index] = 1
     img_hr = np.divide(img_hr, cnt_matrix)
+    img_hr_ctrl = np.divide(img_hr_ctrl, cnt_matrix)
+    #logging.info(cnt_matrix)
+    #logging.info(cnt_matrix[40:60,40:60])
 
-    print('ScSR line 107, img_hr')
-    print(img_hr)
+    logging.info("cardinality="+str(cardinality))
+    logging.info("avg_cardinality="+str(np.mean(cardinality)))
 
-    return img_hr
+    #return img_hr,img_us
+    return img_hr,img_hr_ctrl
