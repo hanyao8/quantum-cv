@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from sklearn import linear_model
 
-from my_algorithms import qubo_lasso
+import my_algorithms
 
 import logging
 from config_run import config
@@ -55,9 +55,10 @@ def lin_scale(xh, us_norm):
         xh = np.multiply(xh, s)
     return xh
 
-def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap, patch_size, sc_algo):
+def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
 
     #patch_size = 3
+    patch_size = config.patch_size
 
     img_us = resize(img_lr_y, size)
     img_us_height, img_us_width = img_us.shape
@@ -110,20 +111,27 @@ def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap, patch_size, sc_algo):
             #print(b.shape)
             #w = fss_yang(lmbd, A, b)
 
-            if sc_algo=="sklearn_lasso":
+            if config.sc_algo=="sklearn_lasso":
                 #reg = linear_model.Lasso(alpha=lmbd)
                 #lasso_alpha = 1e-3
                 #logging.info("lasso_alpha=%s"%str(lasso_alpha))
-                reg = linear_model.Lasso(alpha=config.lasso_alpha)
+                reg = linear_model.Lasso(alpha=config.lasso_alpha,max_iter=1000)
                 #print(Dl.shape)
                 #print(y.shape)
                 reg.fit(Dl,y)
                 w = reg.coef_
                 #logging.info("w="+str(w))
                 
-            elif sc_algo=="qubo_lasso":
-                w = qubo_lasso(Dl,y,alpha=0.1)
-            elif sc_algo=="fss":
+            elif config.sc_algo=="qubo_lasso":
+                #w = qubo_lasso(Dl,y,alpha=0.1)
+                w = my_algorithms.qubo_lasso(Dl,y,alpha=config.lasso_alpha)
+            elif config.sc_algo=="qubo_bsc":
+                #w = qubo_lasso(Dl,y,alpha=0.1)
+                w = my_algorithms.qubo_bsc(Dl,y,alpha=config.bsc_alpha,h_bar=config.bsc_h_bar)
+                if n==0:
+                    logging.info("m=%d, n=0, w="%(m)+str(w))
+                    logging.info("0norm="+str(np.matmul(np.where(np.abs(w)>0,1,0),np.ones(len(w)))))
+            elif config.sc_algo=="fss":
                 b = np.dot(np.multiply(Dl.T, -1), y)
                 if len(b.shape)==1:
                     b = b.reshape((b.shape[0],1))

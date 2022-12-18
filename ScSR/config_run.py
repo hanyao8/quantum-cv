@@ -21,9 +21,15 @@ mode_val = "1img_small"
 
 #algorithm for sparse coding
 C.sc_algo = "sklearn_lasso"
-C.lasso_alpha = 1e-4
 #C.sc_algo = "qubo_lasso"
+C.lasso_alpha = 1e-5
+
+#C.sc_algo = "qubo_bsc"
+#C.bsc_alpha = 0.1
+#C.bsc_h_bar = 0.05
+
 #C.sc_algo = "fss"
+
 
 #C.Dl_path = "data/dicts/Dl_512_US3_L0.1_PS5.pkl"
 #C.Dh_path = "data/dicts/Dh_512_US3_L0.1_PS5.pkl"
@@ -56,7 +62,10 @@ C.lmbd = 0.1
 C.patch_size= 5
 
 #C.overlap = 1
-C.overlap = 3
+#C.overlap = 0
+#C.overlap = 3
+C.overlap = 2
+#C.overlap = 4
 
 
 ############################################

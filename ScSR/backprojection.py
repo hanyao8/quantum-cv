@@ -29,7 +29,8 @@ def backprojection(img_hr, img_lr, maxIter):
     p = np.divide(p, np.sum(p))
 
     #bp_factor = 0.005
-    bp_factor = 0.01
+    #bp_factor = 0.01
+    bp_factor = 1
     logging.info("backprojection factor=%s"%str(bp_factor))
     p = p*bp_factor
 

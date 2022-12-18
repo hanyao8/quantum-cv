@@ -147,15 +147,17 @@ for i in range(len(img_lr_file)):
     #print(img_lr_y.shape)
     #print(img_hr_y.shape)
     #print(upscale)
-    img_sr_y,img_us_y = ScSR(img_lr_y, img_hr_y.shape, upscale, Dh, Dl, lmbd, overlap, config.patch_size, config.sc_algo)
+    img_sr_y,img_us_y = ScSR(img_lr_y, img_hr_y.shape, upscale, Dh, Dl, lmbd, overlap)
     logging.info('After ScSR call')
     logging.info('img_sr_y before BB: '+str(img_sr_y))
+    img_sr_nbp_y = img_sr_y.copy()
     img_sr_y = backprojection(img_sr_y, img_lr_y, maxIter)
     img_us_y = backprojection(img_us_y, img_lr_y, maxIter)
     logging.info('Backprojection done')
 
     img_sr_hmatched_y = match_histograms(image=img_sr_y,reference=img_lr_y,channel_axis=None)
     img_us_y = match_histograms(image=img_us_y,reference=img_lr_y,channel_axis=None)
+    img_sr_nbp_y = match_histograms(image=img_sr_nbp_y,reference=img_lr_y,channel_axis=None)
 
     # Bicubic interpolation for reference
     img_bc = resize(img_lr_ori, (img_hr.shape[0], img_hr.shape[1]))
@@ -174,21 +176,26 @@ for i in range(len(img_lr_file)):
     rmse_sr_hr = np.zeros((1,)) + rmse_sr_hr
     rmse_srhm_hr = np.sqrt(mean_squared_error(img_hr_y, img_sr_hmatched_y))
     rmse_srhm_hr = np.zeros((1,)) + rmse_srhm_hr
+    rmse_srnbp_hr = np.sqrt(mean_squared_error(img_hr_y, img_sr_nbp_y))
+    rmse_srnbp_hr = np.zeros((1,)) + rmse_srnbp_hr
     #np.savetxt(os.path.join(*[config.output_dir, 'RMSE_bicubic.txt']), rmse_bc_hr)
     #np.savetxt(os.path.join(*[config.output_dir, 'RMSE_SR.txt']), rmse_sr_hr)
     logging.info('bicubic RMSE: '+str(rmse_bc_hr))
     logging.info('US/CTRL RMSE: '+str(rmse_us_hr))
     logging.info('SR RMSE: '+str(rmse_sr_hr))
     logging.info('SR Hmatched RMSE: '+str(rmse_srhm_hr))
+    logging.info('SR nbp RMSE: '+str(rmse_srnbp_hr))
 
     y_psnr_bc_hr = 20*math.log10(255.0/rmse_bc_hr)
     y_psnr_us_hr = 20*math.log10(255.0/rmse_us_hr)
     y_psnr_sr_hr = 20*math.log10(255.0/rmse_sr_hr)
     y_psnr_srhm_hr = 20*math.log10(255.0/rmse_srhm_hr)
+    y_psnr_srnbp_hr = 20*math.log10(255.0/rmse_srnbp_hr)
     logging.info('bicubic Y-Channel PSNR: '+str(y_psnr_bc_hr))
     logging.info('US/CTRL Y-Channel PSNR: '+str(y_psnr_us_hr))
     logging.info('SR Y-Channel PSNR: '+str(y_psnr_sr_hr))
     logging.info('SRHM Y-Channel PSNR: '+str(y_psnr_srhm_hr))
+    logging.info('SRNBP Y-Channel PSNR: '+str(y_psnr_srnbp_hr))
 
 ##########################################################################################
 
@@ -228,12 +235,16 @@ for i in range(len(img_lr_file)):
     imsave(os.path.join(*[config.output_dir,'%04d_2SRHM.png'%i]), img_sr_hmatched)
     with open(os.path.join(*[config.output_dir,'%04d_2SRHM.pkl'%i]), 'wb') as f:
         pickle.dump(img_sr_hmatched, f, pickle.HIGHEST_PROTOCOL)
+
     img_sr_final = (np.clip(img_sr_hmatched,0,1)*255).astype(np.uint8)
     #logging.info('img_sr_final: '+str(img_sr_final))
     imsave(os.path.join(*[config.output_dir,'%04d_2SR_final.png'%i]), img_sr_final)
     with open(os.path.join(*[config.output_dir,'%04d_2SR_final.pkl'%i]), 'wb') as f:
         pickle.dump(img_sr_final, f, pickle.HIGHEST_PROTOCOL)
 
+    img_sr_nbp = np.stack((img_sr_nbp_y, img_sr_cb, img_sr_cr), axis=2)
+    img_sr_nbp = ycbcr2rgb(img_sr_nbp)
+    imsave(os.path.join(*[config.output_dir,'%04d_2SRNBP.png'%i]), img_sr_nbp)
 
 
 
