@@ -16,6 +16,12 @@ import my_algorithms
 import logging
 from config_run import config
 
+from dwave.cloud import Client
+from dwave.system import DWaveSampler, EmbeddingComposite
+
+import os
+import dimod
+
 def extract_lr_feat(img_lr):
     h, w = img_lr.shape
     img_lr_feat = np.zeros((h, w, 4))
@@ -79,6 +85,67 @@ def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
 
     cardinality = np.zeros(len(gridx)*len(gridy))
 
+    if config.sc_algo=="qubo_bsc_dwave1": #submit to DWave hybrid solver
+        logging.info("running qubo_bsc_dwave1 in ScSR")
+        n_patches_per_qubo = 8
+        qubo_size = n_patches_per_qubo*Dl.shape[1]
+        client = Client.from_config(token=config.dwave_token)
+        solver = client.get_solver(name='hybrid_binary_quadratic_model_version2')
+        Q_dicts = my_algorithms.create_qubo1(img_lr_y, size, Dl, overlap, n_patches_per_qubo)
+        flattened_m = np.zeros(qubo_size*len(Q_dicts))
+        logging.info("Number of QUBO problems to solve: %d"%(len(Q_dicts)))
+        #raise(Exception)
+        total_qpu_access_time = 0
+        for i in range(len(Q_dicts)):
+            dwave_real_run = False
+            if dwave_real_run:
+                logging.info("i=%d"%i)
+                computation = solver.sample_qubo(Q_dicts[i],time_limit=3.5)
+                logging.info(str(computation.id))
+                logging.info(str(computation.variables))
+                logging.info(str(computation.result))
+                logging.info(str(computation.energies))
+                logging.info(str(computation.samples))
+                #print(computation.sampleset.to_pandas_dataframe())
+                logging.info(str(computation.sampleset.variables))
+                logging.info(str(computation.sampleset.info))
+                total_qpu_access_time += computation.sampleset.info['qpu_access_time']
+                flattened_m[i*qubo_size:i*qubo_size+len(computation.samples[0])] = computation.samples[0]
+                #raise(Exception)
+            
+        logging.info("total_qpu_access_time="+str(total_qpu_access_time))
+
+        with open(os.path.join(*[config.output_dir,'qubo_bsc_dwave_flattened_mw.pkl']), 'wb') as f:
+            pickle.dump(flattened_m*config.bsc_h_bar, f, pickle.HIGHEST_PROTOCOL)
+
+    elif config.sc_algo=="qubo_bsc_dwave2": #submit to Dwave pure quantum solver
+        logging.info("running qubo_bsc_dwave1 in ScSR")
+        qubo_size = config.qubo_size
+
+        sampler_advantage = DWaveSampler(solver={'topology__type':'pegasus'})
+        ec_advantage = EmbeddingComposite(sampler_advantage)
+
+        Q_dicts,sp_map_index,flattened_m = my_algorithms.create_qubo2(img_lr_y, size, Dl, overlap)
+        #flattened_m = np.zeros(len(gridx)*len(gridy)*Dl.shape[1])
+
+        dwave_samplesets = []
+        logging.info("Number of QUBO problems to solve: %d"%(len(Q_dicts)))
+        total_qpu_access_time = 0
+        for i in range(len(Q_dicts)):
+            dwave_real_run = False
+            
+            logging.info("i=%d"%i)
+            if dwave_real_run:
+                sampleset = ec_advantage.sample_qubo(Q_dicts[i],num_reads=config.num_reads)
+            else:
+                Q_tmp = np.random.randint(2,size=Dl.shape[1],dtype=np.int8)
+                Q_tmp_dict = {i:Q_tmp[i] for i in range(Dl.shape[1])}
+                sampleset = dimod.SampleSet.from_samples(dimod.as_samples(Q_tmp_dict), 'BINARY', 0)
+            dwave_samplesets.append(sampleset)
+            logging.info(str(sampleset.info))
+            logging.info("sampleset size="+str(len(sampleset)))
+            #to implement: clamping
+
     for m in tqdm(range(0, len(gridx))):
         logging.info("Inside ScSR loop, iteration=%d"%m)
     #for m in range(0, len(gridx)):
@@ -121,7 +188,6 @@ def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
                 reg.fit(Dl,y)
                 w = reg.coef_
                 #logging.info("w="+str(w))
-                
             elif config.sc_algo=="qubo_lasso":
                 #w = qubo_lasso(Dl,y,alpha=0.1)
                 w = my_algorithms.qubo_lasso(Dl,y,alpha=config.lasso_alpha)
@@ -131,6 +197,29 @@ def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
                 if n==0:
                     logging.info("m=%d, n=0, w="%(m)+str(w))
                     logging.info("0norm="+str(np.matmul(np.where(np.abs(w)>0,1,0),np.ones(len(w)))))
+            elif config.sc_algo=="qubo_bsc_dwave1":
+                w = flattened_m[count*Dl.shape[1]:(count+1)*Dl.shape[1]]
+                if n==0:
+                    logging.info("m=%d, n=0, w="%(m)+str(w))
+                    logging.info("0norm="+str(np.matmul(np.where(np.abs(w)>0,1,0),np.ones(len(w)))))
+            elif config.sc_algo=="qubo_bsc_dwave2":
+                w = flattened_m[count*Dl.shape[1]:(count+1)*Dl.shape[1]]
+                if n==0:
+                    logging.info("From Tabu search, yet to include quantum results")
+                    logging.info("m=%d, n=0, w="%(m)+str(w))
+                    logging.info("0norm="+str(np.matmul(np.where(np.abs(w)>0,1,0),np.ones(len(w)))))
+                subproblems_per_qubo = int(qubo_size/config.subproblem_size)
+                patch_samples = np.zeros((config.num_passes,config.num_reads,config.subproblem_size))
+                patch_energies = np.zeros((config.num_passes,config.num_reads))
+                patch_occurrences = np.zeros((config.num_passes,config.num_reads))
+                for i in range(config.n_passes):
+                    sampleset_no = int(count/subproblems_per_qubo)*config.n_passes+i
+                    offset = (count%subproblems_per_qubo)*config.subproblem_size
+                    sampleset = dwave_samplesets[sampleset_no]
+                    for j in range(len(sampleset.record)):
+                        patch_samples[i][j] = sampleset.record[0][0][offset:offset+config.subproblem_size]
+                        patch_energies[i][j] = sampleset.record[0][1]
+                        patch_occurrences[i][j] = sampleset.record[0][2]
             elif config.sc_algo=="fss":
                 b = np.dot(np.multiply(Dl.T, -1), y)
                 if len(b.shape)==1:
@@ -145,7 +234,27 @@ def ScSR(img_lr_y, size, upscale, Dh, Dl, lmbd, overlap):
 
             cardinality[count-1] = np.matmul(np.where(np.abs(w)>0,1,0),np.ones(len(w)))
 
-            hr_patch = np.dot(Dh, w)
+            beta = 0.01
+            if config.sc_algo=="qubo_bsc_dwave2":
+                hr_patch = np.zeros(Dh.shape[0])
+                p = np.zeros(config.num_reads*config.n_passes)
+                Z = 0 #partition function
+                for j in range(config.num_reads):
+                    for k in range(config.n_passes):
+                        w_tmp = w.copy()
+                        w_tmp[sp_map_index[count][k]] = patch_samples[k][j]
+                        pZ = np.exp(-beta*patch_energies[k][j])*patch_occurrences[k][j]
+                        p[j*config.n_passes+k] = pZ
+                        Z += pZ
+                        hr_patch += pZ*np.dot(Dh, w_tmp)
+                hr_patch = hr_patch/Z
+                p = p/Z
+                gibbs_entropy = -np.sum(p*np.log(p+1e-9))
+                logging.info("Z="+str(Z))
+                logging.info("p sum check: "+str(np.sum(p)))
+                logging.info("gibbs_entropy="+str(gibbs_entropy))
+            else:
+                hr_patch = np.dot(Dh, w)
             #logging.info(hr_patch)
             hr_patch = lin_scale(hr_patch, us_norm)
             #logging.info(us_norm)

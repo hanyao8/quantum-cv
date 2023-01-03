@@ -20,13 +20,20 @@ mode_val = "1img_small"
 #mode_val = "valset"
 
 #algorithm for sparse coding
-C.sc_algo = "sklearn_lasso"
+#C.sc_algo = "sklearn_lasso"
 #C.sc_algo = "qubo_lasso"
-C.lasso_alpha = 1e-5
+#C.lasso_alpha = 1e-5
 
 #C.sc_algo = "qubo_bsc"
-#C.bsc_alpha = 0.1
-#C.bsc_h_bar = 0.05
+C.sc_algo = "qubo_bsc_dwave1"
+#C.sc_algo = "qubo_bsc_dwave2"
+
+C.bsc_alpha = 0.1
+C.bsc_h_bar = 0.05
+
+C.n_passes = 2
+C.qubo_size = 512
+C.subproblem_size = 32
 
 #C.sc_algo = "fss"
 
@@ -61,12 +68,16 @@ C.lmbd = 0.1
 #C.patch_size= 3
 C.patch_size= 5
 
-#C.overlap = 1
 #C.overlap = 0
-#C.overlap = 3
-C.overlap = 2
+#C.overlap = 1
+#C.overlap = 2
+C.overlap = 3
 #C.overlap = 4
 
+############################################
+
+#C.dwave_token = 'DEV-0d65e0f7a19d10d5c0d2fd33c1c88ea7107669a1'
+C.dwave_token = 'DEV-8106d9f8d3de6f69c939f8a459aa10c40eaa70c3'
 
 ############################################
 
@@ -94,14 +105,16 @@ print("exp_name: %s"%C.exp_name)
 
 val_hr_path = {
     "1img":"/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_single_hr",
-    "1img_small":"/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_single_small_hr",
+    #"1img_small":"/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_single_small_hr",
+    "1img_small":"/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_single_small2/HR",
     "valset":"/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_hr"
 }
 C.val_hr_path = val_hr_path[mode_val]
 
 val_lr_path = {
     "1img":"/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_single_lr",
-    "1img_small":"/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_single_small_lr",
+    #"1img_small":"/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_single_small_lr",
+    "1img_small":"/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_single_small2/LR",
     "valset":"/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_lr"
 }
 C.val_lr_path = val_lr_path[mode_val]

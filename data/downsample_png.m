@@ -1,5 +1,6 @@
 %imgs = dir('*.png');
-dataset_dir = 'SR_testing_datasets/Set5';
+dataset_dir = '/scratch_net/kringel/hchoong/github/quantum-cv/ScSR/data/val_single_small2_hr';
+%dataset_dir = 'SR_testing_datasets/Set5';
 %dataset_dir = 'SR_testing_datasets/Set14';
 %dataset_dir = 'SR_testing_datasets/Urban100';
 
@@ -35,7 +36,8 @@ for i = 0:(length(imgs)-1)
     disp(size(cropped));
     
     %x16 = imresize(cropped, 0.0625);
-    img_lr = imresize(cropped, 0.25);
+    %img_lr = imresize(cropped, 0.25);
+    img_lr = imresize(cropped, 0.333);
     
     size(img_lr);
     
